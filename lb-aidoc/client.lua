@@ -130,7 +130,10 @@ function docEnRoute()
                 SetEntityCoords(playerPed, ld.x + 5.0, ld.y + 5.0, ld.z, 0, 0, 0, 1)
                 Wait(2500)
                 DoScreenFadeIn(1500)
-                lastDoctorTime = 0
+                -- Call DoctorNPC for treatment
+                Active = false
+                DoctorNPC()
+                break
             end
         end
         Wait(sleep)
@@ -139,41 +142,47 @@ end
 
 function DoctorNPC()
     if Config.Debug then print('DoctorNPC Triggered') end
-	RequestAnimDict(ANIM_DICT)
-	while not HasAnimDictLoaded(ANIM_DICT) do
-		Wait(1000)
-	end
+    RequestAnimDict(ANIM_DICT)
+    while not HasAnimDictLoaded(ANIM_DICT) do
+        Wait(1000)
+    end
 
-	TaskPlayAnim(ped1, ANIM_DICT, "cpr_pumpchest", 1.0, 1.0, -1, 9, 1.0, 0, 0, 0)
+    TaskPlayAnim(ped1, ANIM_DICT, "cpr_pumpchest", 1.0, 1.0, -1, 9, 1.0, 0, 0, 0)
 
-	PlayAmbientSpeech1(ped1, "GENERIC_CURSE_HIGH", "SPEECH_PARAMS_FORCE", 3)
-	Wait(2000)
-	PlayAmbientSpeech1(ped2, "GENERIC_INSULT_HIGH", "SPEECH_PARAMS_FORCE", 3)
+    PlayAmbientSpeech1(ped1, "GENERIC_CURSE_HIGH", "SPEECH_PARAMS_FORCE", 3)
+    Wait(2000)
+    PlayAmbientSpeech1(ped2, "GENERIC_INSULT_HIGH", "SPEECH_PARAMS_FORCE", 3)
 
-	QBCore.Functions.Progressbar("revive_doc", "HANG IN THERE BUDDY!!", REVIVE_TIME, false, false, {
-		disableMovement = false,
-		disableCarMovement = false,
-		disableMouse = false,
-		disableCombat = true,
-	}, {}, {}, {}, function()
-		ClearPedTasks(ped1)
-		Wait(500)
-		TriggerEvent("hospital:client:Revive")
+    QBCore.Functions.Progressbar("revive_doc", "HANG IN THERE BUDDY!!", REVIVE_TIME, false, false, {
+        disableMovement = false,
+        disableCarMovement = false,
+        disableMouse = false,
+        disableCombat = true,
+    }, {}, {}, {}, function()
+        ClearPedTasks(ped1)
+        Wait(500)
+
+        -- Use the correct server-side event for revival
+        local player = GetPlayerPed(-1)
+        local playerId = GetPlayerServerId(PlayerId())
+        TriggerServerEvent('hospital:server:RevivePlayer', playerId, true)
+
+        -- Notify and log
         TriggerServerEvent('lb:charge')
-		StopScreenEffect('DeathFailOut')
-		QBCore.Functions.Notify("Your treatment is done, you were charged: $"..Config.Price, "success")
-		TriggerServerEvent("qb-log:server:CreateLog", "commands", "Help Command Healed", "green", "Player **".. QBCore.Functions.GetPlayerData().name .. "** Character Name: **" .. QBCore.Functions.GetPlayerData().charinfo["firstname"] .. " " .. QBCore.Functions.GetPlayerData().charinfo["lastname"] .. "** was healed by the AI Doc.")
+        StopScreenEffect('DeathFailOut')
+        QBCore.Functions.Notify("Your treatment is done, you were charged: $"..Config.Price, "success")
+        TriggerServerEvent("qb-log:server:CreateLog", "commands", "Help Command Healed", "green", "Player **".. QBCore.Functions.GetPlayerData().name .. "** Character Name: **" .. QBCore.Functions.GetPlayerData().charinfo["firstname"] .. " " .. QBCore.Functions.GetPlayerData().charinfo["lastname"] .. "** was healed by the AI Doc.")
+
+        -- Reset flags and cleanup
         calledHelp = false
         Revived = true
-
-		--RemovePedElegantly(ped1)
-		TaskEnterVehicle(ped1, veh, 0, 2, 3.0, 1, 0)
-		TaskVehicleDriveWander(ped1, veh, 25.0, 524295)
-		Wait(20000)
-		DeleteEntity(veh)
-		DeleteEntity(ped1)
-		DeleteEntity(ped2)
-	end)
+        TaskEnterVehicle(ped1, veh, 0, 2, 3.0, 1, 0)
+        TaskVehicleDriveWander(ped1, veh, 25.0, 524295)
+        Wait(20000)
+        DeleteEntity(veh)
+        DeleteEntity(ped1)
+        DeleteEntity(ped2)
+    end)
 end
 
 AddEventHandler('onResourceStop', function(resource)
